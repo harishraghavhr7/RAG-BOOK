@@ -1,0 +1,2 @@
+Set-Location "d:\projects\RAG\fullstack-rag\backend"; python app.py
+Set-Location "d:\projects\RAG\fullstack-rag\frontend"; npm start
