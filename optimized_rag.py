@@ -41,7 +41,7 @@ except ImportError:
     print("❌ Ollama client not available")
     OLLAMA_AVAILABLE = False
 
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Any
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -302,9 +302,14 @@ class MistralRAG:
             # Create embeddings with educational context
             enhanced_chunks = []
             for i, chunk in enumerate(self.chunks):
-                metadata = self.chunk_metadata[i]
+                metadata = self.chunk_metadata[i] if i < len(self.chunk_metadata) else {}
+                
+                # Safely get chapter and section with defaults
+                chapter = metadata.get('chapter', f'Chapter {(i // 50) + 1}')
+                section = metadata.get('section', f'Part {(i % 50) + 1}')
+                
                 # Add context to help with retrieval
-                enhanced_text = f"Chapter: {metadata['chapter']} | Section: {metadata['section']} | Content: {chunk}"
+                enhanced_text = f"Chapter: {chapter} | Section: {section} | Content: {chunk}"
                 enhanced_chunks.append(enhanced_text)
             
             embeddings = self.embeddings_model.encode(enhanced_chunks, show_progress_bar=True)
@@ -346,12 +351,17 @@ class MistralRAG:
                 
                 for i, idx in enumerate(indices[0]):
                     if idx < len(self.chunks):
-                        metadata = self.chunk_metadata[idx]
-                        section_key = f"{metadata['chapter']}_{metadata['section']}"
+                        metadata = self.chunk_metadata[idx] if idx < len(self.chunk_metadata) else {}
+                        
+                        # Safely get chapter and section with defaults
+                        chapter = metadata.get('chapter', f'Chapter {(idx // 50) + 1}')
+                        section = metadata.get('section', f'Part {(idx % 50) + 1}')
+                        section_key = f"{chapter}_{section}"
                         
                         # Prefer complete sections and avoid duplicates
                         score = float(scores[0][i])
-                        if metadata['type'] == 'complete_section':
+                        chunk_type = metadata.get('type', 'unknown')
+                        if chunk_type == 'complete_section':
                             score += 0.1  # Boost complete sections
                         
                         if section_key not in seen_sections or len(relevant_chunks) < k//2:
@@ -377,11 +387,16 @@ class MistralRAG:
                 
                 for idx in top_indices:
                     if idx < len(self.chunks):
-                        metadata = self.chunk_metadata[idx]
-                        section_key = f"{metadata['chapter']}_{metadata['section']}"
+                        metadata = self.chunk_metadata[idx] if idx < len(self.chunk_metadata) else {}
+                        
+                        # Safely get chapter and section with defaults
+                        chapter = metadata.get('chapter', f'Chapter {(idx // 50) + 1}')
+                        section = metadata.get('section', f'Part {(idx % 50) + 1}')
+                        section_key = f"{chapter}_{section}"
                         
                         score = float(similarities[idx])
-                        if metadata['type'] == 'complete_section':
+                        chunk_type = metadata.get('type', 'unknown')
+                        if chunk_type == 'complete_section':
                             score += 0.1
                         
                         if section_key not in seen_sections or len(relevant_chunks) < k//2:
@@ -478,7 +493,13 @@ Answer:"""
                 return self.extract_direct_answer(query, combined_context)
             
             # Add source information
-            sources = list(set([chunk['metadata']['chapter'][:50] for chunk in best_chunks]))
+            sources = []
+            for chunk in best_chunks:
+                metadata = chunk.get('metadata', {})
+                chapter = metadata.get('chapter', 'Unknown Chapter')[:50]
+                if chapter not in sources:
+                    sources.append(chapter)
+            
             if sources and len(answer) > 20:
                 answer += f"\n\n📚 Source: {sources[0]}"
             
@@ -606,7 +627,13 @@ Answer:"""
             final_answer = ' '.join(answer_parts)
             
             # Add source information
-            sources = list(set([chunk['metadata']['chapter'][:40] for chunk in context_chunks[:2]]))
+            sources = []
+            for chunk in context_chunks[:2]:
+                metadata = chunk.get('metadata', {})
+                chapter = metadata.get('chapter', 'Unknown Chapter')[:40]
+                if chapter not in sources:
+                    sources.append(chapter)
+                    
             if sources:
                 final_answer += f"\n\n📚 Source: {sources[0]}"
             
@@ -659,7 +686,12 @@ Answer:"""
             
             for chunk in context_chunks[:2]:  # Reduced to top 2 chunks
                 context_parts.append(chunk['text'][:400])  # Reduced chunk size
-                source = f"{chunk['metadata']['chapter']} - {chunk['metadata']['section']}"
+                
+                # Safely access metadata
+                metadata = chunk.get('metadata', {})
+                chapter = metadata.get('chapter', 'Unknown Chapter')
+                section = metadata.get('section', 'Unknown Section')
+                source = f"{chapter} - {section}"
                 if source not in sources:
                     sources.append(source)
             
@@ -787,12 +819,13 @@ Provide a clear, short answer based only on the textbook content above:"""
         print("-" * 60)
         
         for i, chunk in enumerate(relevant_chunks, 1):
+            metadata = chunk.get('metadata', {})
             chunk_info = {
                 'rank': i,
                 'score': chunk['score'],
-                'chapter': chunk['metadata']['chapter'],
-                'section': chunk['metadata']['section'],
-                'type': chunk['metadata']['type'],
+                'chapter': metadata.get('chapter', 'Unknown Chapter'),
+                'section': metadata.get('section', 'Unknown Section'),
+                'type': metadata.get('type', 'unknown'),
                 'text_preview': chunk['text'][:200] + "..." if len(chunk['text']) > 200 else chunk['text'],
                 'text_length': len(chunk['text'])
             }
@@ -800,9 +833,9 @@ Provide a clear, short answer based only on the textbook content above:"""
             
             print(f"\n🎯 CHUNK #{i}")
             print(f"   📊 Relevance Score: {chunk['score']:.4f}")
-            print(f"   📚 Chapter: {chunk['metadata']['chapter'][:60]}...")
-            print(f"   📄 Section: {chunk['metadata']['section']}")
-            print(f"   🔧 Type: {chunk['metadata']['type']}")
+            print(f"   📚 Chapter: {metadata.get('chapter', 'Unknown Chapter')[:60]}...")
+            print(f"   📄 Section: {metadata.get('section', 'Unknown Section')}")
+            print(f"   🔧 Type: {metadata.get('type', 'unknown')}")
             print(f"   📏 Length: {len(chunk['text'])} characters")
             print(f"   📝 Preview: {chunk['text'][:200]}...")
             
@@ -972,6 +1005,135 @@ Provide a clear, short answer based only on the textbook content above:"""
         print(f"📝 Preview: {keyword_answer[:100]}...")
         
         print("\n✅ PIPELINE VERIFICATION COMPLETE!")
+
+    # Additional methods for Flask app compatibility
+    def add_document_from_file(self, file_path: str) -> bool:
+        """Add a document from file (compatibility wrapper for load_and_process_text)"""
+        success = self.load_and_process_text(file_path)
+        if success:
+            # Create embeddings after loading the document
+            self.create_embeddings()
+        return success
+    
+    def ask_question(self, question: str) -> Dict[str, Any]:
+        """Ask a question and get formatted response (compatibility wrapper for query)"""
+        try:
+            answer = self.query(question)
+            
+            # Get relevant chunks for sources
+            relevant_chunks = self.retrieve_relevant_chunks(question, k=5)
+            
+            # Format sources
+            sources = []
+            for i, chunk in enumerate(relevant_chunks[:3]):  # Limit to top 3 sources
+                sources.append({
+                    'text': chunk['text'][:200] + "..." if len(chunk['text']) > 200 else chunk['text'],
+                    'score': chunk['score'],
+                    'chunk_index': chunk.get('index', i)
+                })
+            
+            return {
+                'response': answer,
+                'sources': sources,
+                'mode': 'ollama' if self.ollama_conversation else 'keyword'
+            }
+        except Exception as e:
+            logger.error(f"Error in ask_question: {e}")
+            return {
+                'response': f"Error generating answer: {str(e)}",
+                'sources': [],
+                'mode': 'error'
+            }
+    
+    def search_documents(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
+        """Search documents and return formatted results"""
+        try:
+            relevant_chunks = self.retrieve_relevant_chunks(query, k=top_k)
+            
+            results = []
+            for i, chunk in enumerate(relevant_chunks):
+                # Get full metadata from chunk
+                original_metadata = chunk.get('metadata', {})
+                
+                results.append({
+                    'chunk': chunk['text'],
+                    'score': chunk['score'],
+                    'metadata': {
+                        'filename': 'document.txt',  # Default filename
+                        'chunk_index': chunk.get('index', i),
+                        'chapter': original_metadata.get('chapter', f'Chapter {(i // 50) + 1}'),
+                        'section': original_metadata.get('section', f'Part {(i % 50) + 1}')
+                    }
+                })
+            
+            return results
+        except Exception as e:
+            logger.error(f"Error in search_documents: {e}")
+            return []
+    
+    def get_document_stats(self) -> Dict[str, Any]:
+        """Get statistics about loaded documents"""
+        try:
+            # Create document information structure expected by frontend
+            documents_info = {}
+            chunk_details = []
+            
+            if self.chunks:
+                # Create detailed chunk information
+                for i, chunk in enumerate(self.chunks):
+                    chunk_info = {
+                        'id': i,
+                        'content': chunk[:500] + "..." if len(chunk) > 500 else chunk,  # Truncate for display
+                        'full_length': len(chunk),
+                        'word_count': len(chunk.split()),
+                        'preview': chunk[:100] + "..." if len(chunk) > 100 else chunk
+                    }
+                    
+                    # Add metadata if available
+                    if hasattr(self, 'chunk_metadata') and self.chunk_metadata and i < len(self.chunk_metadata):
+                        metadata = self.chunk_metadata[i]
+                        chunk_info.update({
+                            'section': metadata.get('section', 'Unknown'),
+                            'start_char': metadata.get('start_char', 0),
+                            'end_char': metadata.get('end_char', len(chunk))
+                        })
+                    else:
+                        chunk_info.update({
+                            'section': f'Section {(i // 50) + 1}',  # Group chunks into sections
+                            'start_char': 0,
+                            'end_char': len(chunk)
+                        })
+                    
+                    chunk_details.append(chunk_info)
+                
+                # Document summary
+                documents_info['example.txt'] = {
+                    'chunks': len(self.chunks),
+                    'characters': sum(len(chunk) for chunk in self.chunks),
+                    'sections': list(set([chunk['section'] for chunk in chunk_details])),
+                    'chunk_details': chunk_details
+                }
+            
+            return {
+                'total_chunks': len(self.chunks),
+                'total_characters': sum(len(chunk) for chunk in self.chunks),
+                'average_chunk_size': sum(len(chunk) for chunk in self.chunks) / len(self.chunks) if self.chunks else 0,
+                'embeddings_created': (self.index is not None) or (self.embeddings_matrix is not None),
+                'ollama_available': self.ollama_conversation is not None,
+                'documents': documents_info,
+                'chunks': chunk_details  # Add chunk details at top level for easy access
+            }
+        except Exception as e:
+            logger.error(f"Error getting document stats: {e}")
+            return {
+                'total_chunks': 0,
+                'total_characters': 0,
+                'average_chunk_size': 0,
+                'embeddings_created': (self.index is not None) or (self.embeddings_matrix is not None) if hasattr(self, 'index') and hasattr(self, 'embeddings_matrix') else False,
+                'ollama_available': self.ollama_conversation is not None if hasattr(self, 'ollama_conversation') else False,
+                'documents': {},
+                'chunks': []
+            }
 
 def main():
     """Main function to run the Ollama-powered RAG system"""

@@ -70,7 +70,7 @@ function App() {
       const response = await fetch(`${API_BASE_URL}/documents`);
       const data = await response.json();
       if (data.status === 'success') {
-        setDocumentsInfo(data);
+        setDocumentsInfo(data.stats);  // Use data.stats instead of data
       }
     } catch (error) {
       console.error('Failed to load documents info:', error);
@@ -312,11 +312,12 @@ function App() {
                 {searchResults.map((result, index) => (
                   <div key={index} className="search-result">
                     <div className="result-header">
-                      <strong>{result.metadata.chapter}</strong>
-                      <span className="result-section">{result.metadata.section}</span>
+                      <strong>{result.metadata?.chapter || 'Unknown Chapter'}</strong>
+                      <span className="result-section">{result.metadata?.section || 'Unknown Section'}</span>
+                      <span className="result-score">Score: {(result.score * 100).toFixed(1)}%</span>
                     </div>
                     <div className="result-context">
-                      ...{result.context}...
+                      {result.text}
                     </div>
                   </div>
                 ))}
@@ -347,13 +348,21 @@ function App() {
                       <span>Total Chunks</span>
                     </div>
                     <div className="stat-item">
-                      <strong>{Object.keys(documentsInfo.documents).length}</strong>
+                      <strong>{documentsInfo.documents ? Object.keys(documentsInfo.documents).length : 0}</strong>
                       <span>Documents</span>
+                    </div>
+                    <div className="stat-item">
+                      <strong>{Math.round(documentsInfo.average_chunk_size || 0)}</strong>
+                      <span>Avg Chunk Size</span>
+                    </div>
+                    <div className="stat-item">
+                      <strong>{documentsInfo.embeddings_created ? 'Yes' : 'No'}</strong>
+                      <span>Embeddings</span>
                     </div>
                   </div>
                   
                   <div className="documents-list">
-                    {Object.entries(documentsInfo.documents).map(([docName, docInfo], index) => (
+                    {documentsInfo.documents && Object.entries(documentsInfo.documents).map(([docName, docInfo], index) => (
                       <div key={index} className="document-item">
                         <div className="document-header">
                           <FileText size={20} />
@@ -363,7 +372,7 @@ function App() {
                         <div className="document-sections">
                           <strong>Sections:</strong>
                           <div className="sections-list">
-                            {docInfo.sections.map((section, idx) => (
+                            {docInfo.sections && docInfo.sections.map((section, idx) => (
                               <span key={idx} className="section-tag">{section}</span>
                             ))}
                           </div>
@@ -371,6 +380,37 @@ function App() {
                       </div>
                     ))}
                   </div>
+
+                  {/* Chunk Details Section */}
+                  {documentsInfo.chunks && documentsInfo.chunks.length > 0 && (
+                    <div className="chunks-details">
+                      <h3>📄 Chunk Details ({documentsInfo.chunks.length} total)</h3>
+                      <div className="chunks-grid">
+                        {documentsInfo.chunks.slice(0, 20).map((chunk, idx) => (
+                          <div key={idx} className="chunk-card">
+                            <div className="chunk-header">
+                              <span className="chunk-id">#{chunk.id}</span>
+                              <span className="chunk-section">{chunk.section}</span>
+                              <span className="chunk-length">{chunk.full_length} chars</span>
+                            </div>
+                            <div className="chunk-preview">
+                              <strong>Preview:</strong>
+                              <p>{chunk.preview}</p>
+                            </div>
+                            <div className="chunk-stats">
+                              <span>Words: {chunk.word_count}</span>
+                              <span>Chars: {chunk.full_length}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {documentsInfo.chunks.length > 20 && (
+                        <div className="chunks-note">
+                          <p>Showing first 20 chunks of {documentsInfo.chunks.length} total chunks</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="loading-documents">

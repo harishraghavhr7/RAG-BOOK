@@ -11,9 +11,9 @@ logger = logging.getLogger(__name__)
 # Add the parent directory to sys.path to import our RAG modules
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
-# Force using demo RAG system to avoid network issues
-logger.info("🔄 Using demo RAG system")
-from optimized_rag_demo import MistralRAG
+# Using optimized RAG system
+logger.info("🔄 Using optimized RAG system")
+from optimized_rag import MistralRAG
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all domains on all routes
