@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Bot, User, FileText, Search, AlertCircle, Loader2 } from 'lucide-react';
+import { Send, Bot, User, FileText, Search, AlertCircle, Loader2, Upload } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import './App.css';
 
@@ -17,8 +17,45 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file || !file.name.toLowerCase().endsWith('.pdf')) {
+      setUploadStatus('Please select a PDF file');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadStatus('Uploading...');
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+      if (data.status === 'success') {
+        setUploadStatus('File uploaded and processed successfully!');
+        loadDocuments(); // Refresh documents info
+      } else {
+        setUploadStatus(data.error || 'Upload failed');
+      }
+    } catch (error) {
+      console.error('Upload failed:', error);
+      setUploadStatus('Failed to upload file. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -190,6 +227,13 @@ function App() {
               Search
             </button>
             <button 
+              className={`tab ${activeTab === 'upload' ? 'active' : ''}`}
+              onClick={() => setActiveTab('upload')}
+            >
+              <Upload size={16} />
+              Upload
+            </button>
+            <button 
               className={`tab ${activeTab === 'documents' ? 'active' : ''}`}
               onClick={() => setActiveTab('documents')}
             >
@@ -327,6 +371,36 @@ function App() {
                     <Search size={48} className="no-results-icon" />
                     <h3>No matches found</h3>
                     <p>Try different search terms or check your spelling</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'upload' && (
+            <div className="upload-section">
+              <div className="upload-header">
+                <h2>Upload Document</h2>
+                <p>Upload a PDF document to be processed and added to the knowledge base</p>
+              </div>
+              
+              <div className="upload-container">
+                <div className="upload-box" onClick={() => fileInputRef.current.click()}>
+                  <Upload size={48} className="upload-icon" />
+                  <p>Click to select a PDF file or drag and drop here</p>
+                  <input
+                    type="file"
+                    accept=".pdf"
+                    onChange={handleFileUpload}
+                    ref={fileInputRef}
+                    style={{ display: 'none' }}
+                  />
+                </div>
+                
+                {uploadStatus && (
+                  <div className={`upload-status ${isUploading ? 'uploading' : ''}`}>
+                    {isUploading && <Loader2 className="animate-spin" size={20} />}
+                    <span>{uploadStatus}</span>
                   </div>
                 )}
               </div>

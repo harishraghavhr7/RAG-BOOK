@@ -1,18 +1,24 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from werkzeug.utils import secure_filename
 import os
 import sys
 import logging
+from pdf_utils import process_pdf
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Configure upload settings
+UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), '..', '..', 'data')
+ALLOWED_EXTENSIONS = {'pdf'}
+
 # Add the parent directory to sys.path to import our RAG modules
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
-# Using optimized RAG system
-logger.info("🔄 Using optimized RAG system")
+# Using optimized RAG system with Gemini
+logger.info("🔄 Using optimized RAG system with Gemini")
 from optimized_rag import MistralRAG
 
 app = Flask(__name__)
@@ -177,6 +183,61 @@ def get_documents():
         
     except Exception as e:
         logger.error(f"Error getting documents info: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+def allowed_file(filename):
+    """Check if the file extension is allowed"""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route('/api/upload', methods=['POST'])
+def upload_file():
+    """Handle file upload"""
+    try:
+        # Check if file part exists
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file part'}), 400
+            
+        file = request.files['file']
+        
+        # Check if a file was selected
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+            
+        # Check file extension
+        if not allowed_file(file.filename):
+            return jsonify({'error': 'File type not allowed'}), 400
+            
+        # Save and process the file
+        try:
+            # Secure the filename and save the PDF
+            filename = secure_filename(file.filename)
+            pdf_path = os.path.join(UPLOAD_FOLDER, filename)
+            file.save(pdf_path)
+            
+            # Process the PDF and extract text
+            txt_path = process_pdf(pdf_path, UPLOAD_FOLDER)
+            
+            # Remove the PDF file after processing
+            os.remove(pdf_path)
+            
+            # Reinitialize RAG to include the new file
+            rag = initialize_rag()
+            if not rag:
+                logger.error("Failed to reinitialize RAG after file upload")
+                return jsonify({'error': 'Failed to process document'}), 500
+            
+            return jsonify({
+                'status': 'success',
+                'message': 'File uploaded and processed successfully',
+                'filename': os.path.basename(txt_path)
+            })
+            
+        except Exception as e:
+            logger.error(f"Error processing uploaded file: {e}")
+            return jsonify({'error': 'Failed to process file'}), 500
+            
+    except Exception as e:
+        logger.error(f"Error handling file upload: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
 if __name__ == '__main__':
