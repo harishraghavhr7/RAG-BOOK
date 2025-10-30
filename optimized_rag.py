@@ -1,7 +1,14 @@
 import os
 import re
-import numpy as np
 import json
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except Exception as e:
+    np = None
+    NUMPY_AVAILABLE = False
+    import logging as _logging
+    _logging.getLogger(__name__).warning(f"NumPy import failed: {e}. Embedding and FAISS operations will be disabled.")
 from sentence_transformers import SentenceTransformer
 
 # Configure logging early so we can use logger during module import
@@ -58,18 +65,69 @@ class MistralRAG:
             import os
             
             # Allow overriding the embedding model with an environment variable
-            model_name = os.getenv('EMBEDDING_MODEL', 'all-mpnet-base-v2')
-            logger.info(f"Loading sentence transformer model ({model_name})...")
-            try:
-                self.embeddings_model = SentenceTransformer(model_name)
-                logger.info(f"✅ Sentence transformer loaded successfully ({model_name})")
-            except Exception as e:
-                logger.error(f"❌ Failed to load {model_name}: {e}")
-                # Fallback to a smaller model that is faster to download
-                fallback = 'all-MiniLM-L6-v2'
-                logger.info(f"Falling back to smaller embedding model: {fallback}")
-                self.embeddings_model = SentenceTransformer(fallback)
-                logger.info(f"✅ Sentence transformer loaded successfully ({fallback})")
+            # Default to a smaller model to reduce download size and startup issues
+            model_name = os.getenv('EMBEDDING_MODEL', 'all-MiniLM-L6-v2')
+
+            # Connectivity / name resolution check for huggingface to avoid long retries
+            def _host_resolves(host: str = 'huggingface.co') -> bool:
+                try:
+                    import socket
+                    socket.getaddrinfo(host, None)
+                    return True
+                except Exception:
+                    return False
+
+            should_try_remote = True
+            # If the env var points to a local path, prefer it regardless of network
+            if os.path.exists(model_name):
+                should_try_remote = False
+
+            # If huggingface DNS is not resolvable and model_name looks like a hub id, skip remote attempt
+            if not _host_resolves() and (not os.path.exists(model_name)):
+                logger.warning("⚠️ Cannot resolve huggingface.co — network may be down or DNS blocked. Skipping remote model download.")
+                should_try_remote = False
+
+            logger.info(f"Loading sentence transformer model ({model_name})... (remote_ok={should_try_remote})")
+
+            tried_models = []
+            load_error = None
+
+            # Helper to attempt loading a model and record errors
+            def _try_load(name: str):
+                nonlocal load_error
+                try:
+                    m = SentenceTransformer(name)
+                    logger.info(f"✅ Sentence transformer loaded successfully ({name})")
+                    return m
+                except Exception as e:
+                    load_error = e
+                    logger.warning(f"Failed to load model {name}: {e}")
+                    return None
+
+            # First attempt: model_name if remote allowed or local path
+            if should_try_remote or os.path.exists(model_name):
+                tried_models.append(model_name)
+                self.embeddings_model = _try_load(model_name)
+            else:
+                self.embeddings_model = None
+
+            # Fallback list (smaller, more likely cached / quicker)
+            fallback_models = ['all-MiniLM-L6-v2', 'sentence-transformers/all-MiniLM-L6-v2']
+
+            # Try fallbacks if initial load failed
+            if getattr(self, 'embeddings_model', None) is None:
+                for fb in fallback_models:
+                    if fb in tried_models:
+                        continue
+                    tried_models.append(fb)
+                    self.embeddings_model = _try_load(fb)
+                    if self.embeddings_model:
+                        break
+
+            if getattr(self, 'embeddings_model', None) is None:
+                # Final attempt: if network was previously unavailable, try local-only small model name
+                logger.error(f"❌ All attempts to load embedding models failed. Last error: {load_error}")
+                raise Exception("Failed to initialize embeddings model") from load_error
         except Exception as e:
             logger.error(f"❌ Failed to load sentence transformer: {e}")
             logger.info("💡 This might be due to network issues downloading the model.")
@@ -382,8 +440,13 @@ class MistralRAG:
                 enhanced_text = f"Chapter: {chapter} | Section: {section} | Content: {chunk}"
                 enhanced_chunks.append(enhanced_text)
             
+            # If NumPy is not available, we cannot create proper embeddings/indexes.
+            if not NUMPY_AVAILABLE:
+                logger.warning("⚠️ NumPy not available — skipping embedding creation. Retrieval will use keyword-overlap fallback.")
+                return False
+
             embeddings = self.embeddings_model.encode(enhanced_chunks, show_progress_bar=True)
-            
+
             if self.use_faiss:
                 # Create FAISS index
                 dimension = embeddings.shape[1]
@@ -423,10 +486,28 @@ class MistralRAG:
     def retrieve_relevant_chunks(self, query: str, k: int = 5) -> List[Dict]:
         """Retrieve most relevant chunks with enhanced scoring"""
         try:
+            # If embeddings/index are not available, fallback to a simple keyword-overlap search
+            if not NUMPY_AVAILABLE or (not self.use_faiss and self.embeddings_matrix is None) or (self.use_faiss and self.index is None):
+                logger.warning("⚠️ Using keyword-overlap fallback for retrieval (no embeddings available)")
+                qwords = set(re.findall(r"\w+", query.lower()))
+                scored = []
+                for idx, chunk in enumerate(self.chunks):
+                    cwords = set(re.findall(r"\w+", chunk.lower()))
+                    overlap = len(qwords & cwords)
+                    if overlap > 0:
+                        score = overlap / (len(qwords) or 1)
+                        metadata = self.chunk_metadata[idx] if idx < len(self.chunk_metadata) else {}
+                        scored.append((score, idx, metadata))
+                scored.sort(key=lambda x: x[0], reverse=True)
+                results = []
+                for score, idx, metadata in scored[:k]:
+                    results.append({'text': self.chunks[idx], 'score': float(score), 'metadata': metadata})
+                return results
+
             # Enhance query for better retrieval
             enhanced_query = f"Question about: {query}"
             query_embedding = self.embeddings_model.encode([enhanced_query])
-            
+
             if self.use_faiss and self.index is not None:
                 # Use FAISS for similarity search
                 faiss.normalize_L2(query_embedding)
@@ -1438,12 +1519,43 @@ Only return the structured Teaching Response (do not include any other text)."""
 
     # Additional methods for Flask app compatibility
     def add_document_from_file(self, file_path: str) -> bool:
-        """Add a document from file (compatibility wrapper for load_and_process_text)"""
-        success = self.load_and_process_text(file_path)
-        if success:
-            # Create embeddings after loading the document
-            self.create_embeddings()
-        return success
+        """Add a document from file by appending its chunks to the current corpus.
+
+        The previous implementation called `load_and_process_text` which overwrote
+        `self.chunks` and `self.chunk_metadata`, causing previously loaded files to
+        be discarded when multiple files were loaded sequentially. This method
+        reads and smart-chunks the new file, appends the chunks and metadata to
+        the existing corpus, and then (re)builds embeddings/index for the full
+        corpus so retrieval covers all documents.
+        """
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                text = f.read()
+
+            # Create chunk data for the new file without mutating existing data
+            new_chunk_data = self.smart_chunk_text(text)
+            if not new_chunk_data:
+                logger.warning(f"No chunks created for {file_path}")
+                return False
+
+            new_chunks = [c['text'] for c in new_chunk_data]
+
+            # Append to existing corpus
+            self.chunks.extend(new_chunks)
+            self.chunk_metadata.extend(new_chunk_data)
+
+            logger.info(f"✅ Added {len(new_chunks)} chunks from {os.path.basename(file_path)}")
+
+            # Rebuild embeddings/index for the full corpus
+            created = self.create_embeddings()
+            if not created:
+                logger.error("Failed to create embeddings after adding document")
+                return False
+
+            return True
+        except Exception as e:
+            logger.error(f"❌ Error adding document from file {file_path}: {e}")
+            return False
     
     def ask_question(self, question: str) -> Dict[str, Any]:
         """Ask a question and get formatted response (compatibility wrapper for query)"""

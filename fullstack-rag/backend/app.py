@@ -20,6 +20,31 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 # Using optimized RAG system with Gemini
 logger.info("🔄 Using optimized RAG system with Gemini")
 from optimized_rag import MistralRAG
+import optimized_rag_demo as demo_rag
+
+def check_numpy_compatibility():
+    try:
+        import numpy as _np
+        ver = _np.__version__
+        major = int(ver.split('.')[0]) if ver else 0
+        if major >= 2:
+            logger.warning(
+                "Detected NumPy >=2.0 which can be incompatible with some compiled packages (torch/pybind).\n"
+                "Recommended: install a NumPy 1.x build compatible with your environment.\n"
+                "Example (in a virtualenv): python -m pip install \"numpy<2.0\"\n"
+            )
+        else:
+            logger.info(f"NumPy version {ver} detected — compatible.")
+    except Exception:
+        logger.error(
+            "NumPy is not installed or could not be imported. Embeddings (sentence-transformers/FAISS) will not work.\n"
+            "To fix: create and activate a virtual environment then run:\n"
+            "python -m venv .venv\n"
+            ".\\.venv\\Scripts\\Activate.ps1  # (PowerShell)\n"
+            "python -m pip install -r requirements.txt\n"
+        )
+
+check_numpy_compatibility()
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all domains on all routes
@@ -44,9 +69,15 @@ def initialize_rag():
         except Exception as model_error:
             logger.error(f"❌ Failed to initialize RAG system: {model_error}")
             logger.info("💡 This might be due to network issues downloading the model.")
-            logger.info("💡 Please ensure you have internet connectivity or try again later.")
-            logger.info("💡 You can also run the demo version: python fullstack-rag/backend/app_demo.py")
-            return None
+            logger.info("💡 Falling back to demo RAG implementation to keep the server running.")
+            try:
+                rag_instance = demo_rag.MistralRAG()
+                rag_initialized = True
+                logger.info("✅ Demo RAG initialized as a fallback")
+            except Exception as demo_error:
+                logger.error(f"❌ Failed to initialize demo RAG fallback: {demo_error}")
+                logger.info("💡 You can try to run the demo directly: python fullstack-rag/backend/app_demo.py")
+                return None
         
         # Load data from the data directory
         data_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'data')
