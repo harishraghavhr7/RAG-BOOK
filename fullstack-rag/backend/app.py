@@ -65,7 +65,6 @@ def initialize_rag():
     try:
         logger.info("Initializing RAG system...")
         
-        # Try to initialize RAG, but handle network errors gracefully
         try:
             rag_instance = MistralRAG()
         except Exception as model_error:
