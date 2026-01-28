@@ -4,7 +4,9 @@ from werkzeug.utils import secure_filename
 import os
 import sys
 import logging
+import json
 from pdf_utils import process_pdf
+import re
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -113,6 +115,12 @@ def health_check():
         'chunks_loaded': len(rag_instance.chunks) if rag_instance else 0
     })
 
+
+
+
+
+
+
 @app.route('/api/chat', methods=['POST'])
 def chat():
     """Main chat endpoint"""
@@ -139,12 +147,71 @@ def chat():
         # Get response from RAG
         logger.info(f"Processing query: {message}")
         result = rag.ask_question(message)
-        
+        # Normalize and structure the response for consistent frontend rendering.
+        raw_response = result.get('response', '') if isinstance(result, dict) else str(result)
+
+        # Normalize line endings and split into paragraphs. Then join paragraphs
+        # with a blank line (i.e., two newlines) so frontends display spacing.
+        def format_response_text(text: str):
+            if text is None:
+                return '', []
+            # normalize CRLF
+            txt = text.replace('\r\n', '\n').replace('\r', '\n')
+            # split on one-or-more blank lines
+            paragraphs = [p.strip() for p in re.split(r'\n\s*\n+', txt) if p.strip()]
+            # fallback: split on single newlines if we didn't find paragraph separators
+            if not paragraphs:
+                paragraphs = [line.strip() for line in txt.split('\n') if line.strip()]
+            formatted = '\n\n'.join(paragraphs)
+            return formatted, paragraphs
+
+        formatted_text, paragraphs = format_response_text(raw_response)
+
+        # Derive a list of structured points from the paragraphs.
+        def extract_points(paragraphs_list):
+            pts = []
+            for p in paragraphs_list:
+                if not p:
+                    continue
+
+                # 1) If the paragraph contains explicit list items (bullets or numbers), extract them.
+                list_items = [m.group(1).strip() for m in re.finditer(r'^\s*(?:[-*\u2022]|\d+[\).])\s*(.+)$', p, re.MULTILINE)]
+                if list_items:
+                    pts.extend(list_items)
+                    continue
+
+                # 2) Otherwise, split paragraph into sentences and treat each sentence as a point.
+                sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', p) if s.strip()]
+                if sentences:
+                    pts.extend(sentences)
+                else:
+                    # Fallback: use the whole paragraph
+                    pts.append(p.strip())
+
+            # Trim and dedupe small duplicates while preserving order
+            seen = set()
+            cleaned = []
+            for t in pts:
+                if not t:
+                    continue
+                key = t.strip()
+                if key in seen:
+                    continue
+                seen.add(key)
+                cleaned.append(key)
+
+            # Limit to a reasonable number of points
+            return cleaned[:50]
+
+        response_points = extract_points(paragraphs)
+
         return jsonify({
-            'response': result.get('response', 'No response generated'),
-            'sources': result.get('sources', []),
+            'response': formatted_text,
+            'response_paragraphs': paragraphs,
+            'response_points': response_points,
+            'sources': result.get('sources', []) if isinstance(result, dict) else [],
             'status': 'success',
-            'mode': result.get('mode', 'unknown')
+            'mode': result.get('mode', 'unknown') if isinstance(result, dict) else 'unknown'
         })
         
     except Exception as e:
@@ -216,6 +283,47 @@ def get_documents():
         logger.error(f"Error getting documents info: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
+
+@app.route('/api/documents', methods=['DELETE'])
+def delete_document():
+    """Delete a document (text file) and remove its chunks from the RAG index"""
+    try:
+        data = request.get_json()
+        if not data or 'filename' not in data:
+            return jsonify({'error': 'filename is required'}), 400
+
+        filename = secure_filename(data['filename'])
+        txt_path = os.path.join(UPLOAD_FOLDER, filename)
+
+        # Initialize RAG
+        rag = initialize_rag()
+        if not rag:
+            return jsonify({'error': 'RAG not initialized'}), 500
+
+        # Remove chunks from RAG
+        removed = rag.remove_document_by_filename(filename)
+        if not removed:
+            # Even if no chunks were removed, attempt to delete the file if present
+            if os.path.exists(txt_path):
+                try:
+                    os.remove(txt_path)
+                except Exception:
+                    pass
+            return jsonify({'error': 'Document not found in RAG or removal failed'}), 404
+
+        # Delete the file from disk if present
+        try:
+            if os.path.exists(txt_path):
+                os.remove(txt_path)
+        except Exception as e:
+            logger.warning(f"Failed to delete file from disk: {e}")
+
+        return jsonify({'status': 'success', 'message': f'{filename} removed'}), 200
+
+    except Exception as e:
+        logger.error(f"Error deleting document: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
 def allowed_file(filename):
     """Check if the file extension is allowed"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -250,12 +358,20 @@ def upload_file():
             
             # Remove the PDF file after processing
             os.remove(pdf_path)
-            
-            # Reinitialize RAG to include the new file
+            # Ensure RAG is initialized and then add the new text file incrementally
             rag = initialize_rag()
             if not rag:
-                logger.error("Failed to reinitialize RAG after file upload")
+                logger.error("Failed to initialize RAG after file upload")
                 return jsonify({'error': 'Failed to process document'}), 500
+
+            try:
+                added = rag.add_document_from_file(txt_path)
+                if not added:
+                    logger.error(f"Failed to add document to RAG: {txt_path}")
+                    return jsonify({'error': 'Failed to add document to RAG'}), 500
+            except Exception as e:
+                logger.error(f"Exception while adding document: {e}")
+                return jsonify({'error': 'Failed to add document to RAG'}), 500
             
             return jsonify({
                 'status': 'success',

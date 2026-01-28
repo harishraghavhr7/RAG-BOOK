@@ -409,7 +409,13 @@ class MistralRAG:
             
             # Smart chunking
             chunk_data = self.smart_chunk_text(text)
-            
+            # Attach filename metadata when available
+            filename = os.path.basename(file_path)
+            for md in chunk_data:
+                if 'filename' not in md:
+                    md['filename'] = filename
+
+            # Overwrite corpus (used for single-file loading)
             self.chunks = [chunk['text'] for chunk in chunk_data]
             self.chunk_metadata = chunk_data
             
@@ -1538,6 +1544,12 @@ Only return the structured Teaching Response (do not include any other text)."""
                 logger.warning(f"No chunks created for {file_path}")
                 return False
 
+            # Attach filename metadata
+            filename = os.path.basename(file_path)
+            for md in new_chunk_data:
+                if 'filename' not in md:
+                    md['filename'] = filename
+
             new_chunks = [c['text'] for c in new_chunk_data]
 
             # Append to existing corpus
@@ -1555,6 +1567,41 @@ Only return the structured Teaching Response (do not include any other text)."""
             return True
         except Exception as e:
             logger.error(f"❌ Error adding document from file {file_path}: {e}")
+            return False
+
+    def remove_document_by_filename(self, filename: str) -> bool:
+        """Remove all chunks that were created from a given filename and rebuild embeddings."""
+        try:
+            # Normalize filename
+            base = os.path.basename(filename)
+            # Filter out chunks whose metadata filename matches
+            remaining_chunks = []
+            remaining_metadata = []
+            removed = 0
+            for i, md in enumerate(self.chunk_metadata):
+                md_fname = md.get('filename', None)
+                if md_fname and os.path.basename(md_fname) == base:
+                    removed += 1
+                    continue
+                remaining_metadata.append(md)
+                # corresponding chunk text
+                remaining_chunks.append(self.chunks[i])
+
+            if removed == 0:
+                logger.warning(f"No chunks found for file: {base}")
+                return False
+
+            # Replace corpus and rebuild
+            self.chunks = remaining_chunks
+            self.chunk_metadata = remaining_metadata
+            logger.info(f"✅ Removed {removed} chunks from {base}. Rebuilding embeddings...")
+            created = self.create_embeddings()
+            if not created:
+                logger.error("Failed to rebuild embeddings after removal")
+                return False
+            return True
+        except Exception as e:
+            logger.error(f"Error removing document {filename}: {e}")
             return False
     
     def ask_question(self, question: str) -> Dict[str, Any]:
@@ -1617,45 +1664,54 @@ Only return the structured Teaching Response (do not include any other text)."""
         """Get statistics about loaded documents"""
         try:
             # Create document information structure expected by frontend
-            documents_info = {}
-            chunk_details = []
-            
+            documents_info: Dict[str, Any] = {}
+            chunk_details: List[Dict[str, Any]] = []
+
             if self.chunks:
-                # Create detailed chunk information
+                # Build chunk details and group by filename
+                per_file: Dict[str, Dict[str, Any]] = {}
+
                 for i, chunk in enumerate(self.chunks):
+                    metadata = self.chunk_metadata[i] if i < len(self.chunk_metadata) else {}
+                    filename = metadata.get('filename', 'unknown.txt')
+                    filename = os.path.basename(filename)
+
                     chunk_info = {
                         'id': i,
-                        'content': chunk[:500] + "..." if len(chunk) > 500 else chunk,  # Truncate for display
+                        'filename': filename,
+                        'content': chunk[:500] + "..." if len(chunk) > 500 else chunk,
                         'full_length': len(chunk),
                         'word_count': len(chunk.split()),
-                        'preview': chunk[:100] + "..." if len(chunk) > 100 else chunk
+                        'preview': chunk[:100] + "..." if len(chunk) > 100 else chunk,
+                        'section': metadata.get('section', f'Section {(i // 50) + 1}'),
+                        'start_char': metadata.get('start_char', 0),
+                        'end_char': metadata.get('end_char', len(chunk))
                     }
-                    
-                    # Add metadata if available
-                    if hasattr(self, 'chunk_metadata') and self.chunk_metadata and i < len(self.chunk_metadata):
-                        metadata = self.chunk_metadata[i]
-                        chunk_info.update({
-                            'section': metadata.get('section', 'Unknown'),
-                            'start_char': metadata.get('start_char', 0),
-                            'end_char': metadata.get('end_char', len(chunk))
-                        })
-                    else:
-                        chunk_info.update({
-                            'section': f'Section {(i // 50) + 1}',  # Group chunks into sections
-                            'start_char': 0,
-                            'end_char': len(chunk)
-                        })
-                    
+
                     chunk_details.append(chunk_info)
-                
-                # Document summary
-                documents_info['example.txt'] = {
-                    'chunks': len(self.chunks),
-                    'characters': sum(len(chunk) for chunk in self.chunks),
-                    'sections': list(set([chunk['section'] for chunk in chunk_details])),
-                    'chunk_details': chunk_details
-                }
-            
+
+                    if filename not in per_file:
+                        per_file[filename] = {
+                            'chunks': 0,
+                            'characters': 0,
+                            'sections_set': set(),
+                            'chunk_details': []
+                        }
+
+                    per_file[filename]['chunks'] += 1
+                    per_file[filename]['characters'] += len(chunk)
+                    per_file[filename]['sections_set'].add(chunk_info['section'])
+                    per_file[filename]['chunk_details'].append(chunk_info)
+
+                # Convert per_file structure into documents_info with lists
+                for fname, info in per_file.items():
+                    documents_info[fname] = {
+                        'chunks': info['chunks'],
+                        'characters': info['characters'],
+                        'sections': list(info['sections_set']),
+                        'chunk_details': info['chunk_details']
+                    }
+
             return {
                 'total_chunks': len(self.chunks),
                 'total_characters': sum(len(chunk) for chunk in self.chunks),
@@ -1663,7 +1719,7 @@ Only return the structured Teaching Response (do not include any other text)."""
                 'embeddings_created': (self.index is not None) or (self.embeddings_matrix is not None),
                 'gemini_available': self.gemini_conversation is not None,
                 'documents': documents_info,
-                'chunks': chunk_details  # Add chunk details at top level for easy access
+                'chunks': chunk_details
             }
         except Exception as e:
             logger.error(f"Error getting document stats: {e}")

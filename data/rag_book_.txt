@@ -1,0 +1,646 @@
+--- Page 1 ---
+BONAFIDE CERTIFICATE
+Certificated that this project titled “RAG BOOK” is the Bonafide work of HARISH T
+(714023247019) who carried out the work under my supervision.
+SIGNATURE SIGNATURE
+Mrs. S. Hemalatha Mrs. S. Hemalatha
+HEAD OF THE DEPARTMENT PROFESSOR
+Artificial Intelligence and Artificial Intelligence and
+Machine Learning, Machine Learning,
+Sri Shakthi Institute of Engineering Sri Shakthi Institute of Engineering and
+Technology, and Technology,
+Coimbatore – 641 062. Coimbatore – 641 062.
+Submitted for the project work viva-voce Examination held on …………….
+INTERNAL EXAMINER EXTERNAL EXAMINER
+ii
+
+--- Page 2 ---
+ACKNOWLEDGMENT
+First and foremost, I would like to thank God Almighty for giving me strength Without his
+blessings, this achievement would not have been possible.
+We express our deepest gratitude to our Chairman Dr. S. Thangavelu for his continuous
+encouragement and support throughout our course of study.
+We are thankful to our Secretary Er.T. Dheepan for his unwavering support during the
+entire course of this project work.
+We are also thankful to our Joint Secretary Mr. T. Sheelan for his support during the entire
+course of this project work.
+We are highly indebted to Principal Dr. N.K Sakthivel for their support during the tenure
+of the project.
+We are deeply indebted to our Head of the Department, Artificial Intelligence and
+Machine Learning. Mrs. S. Hemalatha, for providing us with the necessary facilities.
+It's a great pleasure to thank our Project Guide Mrs. S. Hemalatha for his valuable technical
+suggestions
+and continuous guidance throughout this project work.
+We solemnly extend our thanks to all the teachers and non-teaching staff of our department,
+family, and friends for their valuable support.
+HARISH T (714023247019)
+iii
+
+--- Page 3 ---
+ABSTRACT
+The rise of large language models (LLMs) has enabled powerful AI-driven conversations,
+but existing solutions often fall short when dealing with user-specific or domain-specific
+data. Traditional chatbots rely on pretrained knowledge, limiting their ability to answer
+questions accurately from custom documents. Retrieval-Augmented Generation (RAG) has
+emerged as a promising approach to overcome this limitation by combining information
+retrieval with natural language generation—but most implementations lack modularity,
+flexibility, and ease of integration with evolving AI tools.
+This project addresses these challenges by building a customizable RAG-based system that
+allows users to upload documents and query them through a seamless chat interface. Unlike
+existing static or proprietary platforms, this architecture supports dynamic data ingestion,
+pluggable LLM providers, and an extensible pipeline for document processing and semantic
+retrieval. It enables direct integration with local or external vector stores and backend
+microservices without vendor lock-in. The solution leverages Python (Flask) for the
+backend REST API and RAG orchestration, React for the frontend chat UI, and optional
+Node.js + MongoDB for chat history persistence. Document processing and embedding are
+powered by libraries such as sentence-transformers and FAISS, while LLM responses are
+generated via Gemini or Ollama adapters. This tech stack provides a flexible, modern
+foundation for building intelligent, document-aware chat applications suitable for
+enterprise, educational, or personal use cases.
+iv
+
+--- Page 4 ---
+TABLE OF CONTENTS
+CHAPTER NO TITLE P. NO
+iii
+ACKNOWLEDGEMENT
+iv
+ABSTRACT
+vi
+LIST OF FIGURES
+01
+1 INTRODUCTION
+03
+2 LITERATURE REVIEW
+03
+2.1 HISTORICAL CONTEXT
+03
+2.2 INITIATIVE ASPECT
+03
+2.3 CURRENT SCENARIO
+04
+3 EXISTING METHOD
+04
+3.1 DISADVANTAGES
+06
+4 PROPOSED METHOD
+06
+4.1 ADVANTAGES
+9
+5 SYSTEM ANALYSIS
+9
+5.1 SOFTWARE REQUIREMENTS
+6
+11
+DESIGN AND IMPLEMENTATION
+11
+6.1 WORK FLOW
+11
+6.2 SYSTEM ARCHITECTURE
+12
+6.3 IMPLEMENTATION
+16
+RESULT AND ANALYSIS
+7
+16
+7.1 CHATBOT PAGE
+16
+7.2 SEARCH DOCUMENT
+17
+7.3 UPLOAD DOCUMENT
+18
+7.4 LOADED DOCUMENTS
+8
+19
+CONCLUSION AND FUTURE ENHANCEMENT
+19
+8.1 CONCLUSION
+19
+8.2 FUTURE ENHANCEMENT
+20
+9 REFERENCES
+
+--- Page 5 ---
+LIST OF FIGURES
+FIGURE NO DESCRIPTION PAGE NO
+6.1.1 WORK FLOW 11
+7.1.1 CHATBOT PAGE 16
+7.2.1 SEARCH DOCUMENT PAGE 17
+7.3.1 UPLOAD DOCUMENT PAGE 17
+7.4.1 LOADED DOCUMENT PAGE 18
+
+--- Page 6 ---
+CHAPTER 1
+INTRODUCTION
+The Intelligent Document Retrieval and Chatbot System is a web-based platform designed to redefine how
+users interact with unstructured data, offering an interactive and AI-powered interface for querying
+documents in natural language. In traditional digital or physical archives, users often face challenges in
+locating specific information quickly, as they must manually browse through lengthy files, search tools
+with limited precision, or depend on structured metadata. Such methods are inefficient, error-prone, and
+unable to handle the scale and complexity of modern document repositories. This project aims to solve
+these issues by implementing a Retrieval-Augmented Generation (RAG) system that combines information
+retrieval techniques with advanced language models to deliver precise, context-aware responses augmented
+by relevant document excerpts.
+The system is tailored for multiple user roles, including general users, administrators, and advanced AI
+operators. Users can upload or ingest documents like notes, reports, or PDFs into the system through a
+simple user interface. Once processed, these documents are chunked and embedded into a vector space,
+allowing semantic search over their contents. Instead of navigating through folders or keyword-based
+search tools, users can interact with the system through a chat-based interface. They can ask questions in
+natural language, and the chatbot responds with AI-generated answers powered by Large Language Models
+(LLMs), accompanied by accurate reference snippets from the original documents. This enhances both the
+trustworthiness and practicality of the responses.
+One of the system’s most impactful features is its ability to connect multiple LLM providers seamlessly.
+Whether using local open-source models via frameworks like Ollama or cloud-based models such as
+Google Gemini, the backend supports interchangeable inference backends through modular client adapters.
+This flexibility allows institutions or companies to optimize their applications based on cost, latency, or
+data privacy requirements while maintaining the same user experience. The backend is built using Flask, a
+lightweight Python framework, which handles API routing, document processing, and LLM orchestration.
+Document data is stored and indexed locally during development, but the architecture allows easy
+migration to production-ready vector databases when scaling demands arise.
+In addition to retrieval and answering, the platform maintains transparency and traceability through
+dedicated health and status endpoints. Users can check system readiness, document count, index status,
+1
+
+--- Page 7 ---
+and LLM connection availability in real time. This ensures smooth operation during development and
+provides a foundation for building robust monitoring tools in production environments.
+User experience is at the core of the system’s design. The frontend is developed using React, providing a
+modern chat interface that is responsive and intuitive. Users can upload files, view conversation context,
+and follow response sources—all within a clean UI that mirrors the feel of interacting with a human
+assistant. The platform is responsive and device-friendly, allowing seamless access across desktops,
+tablets, or mobile devices.
+Beyond enabling dynamic document querying, this system serves as a foundation for future enterprise
+features such as role-based authentication, audit logging, face recognition validation, and real-time
+analytics. The modular architecture makes it easy to plug in new APIs or integrate with specialized systems
+such as learning management platforms, knowledge bases, or compliance dashboards. By merging AI
+capabilities with an extensible web stack, the system addresses immediate challenges in information
+retrieval while paving the way for broader digital transformation. With its emphasis on precision, usability,
+and flexibility, this project stands not just as a tool for querying documents but as a step toward building
+smarter and more responsive knowledge management systems. In future iterations, the platform could also
+support enhanced content summarization, multilingual support, and automated compliance checks, making
+it an indispensable tool in fields like education, research, and corporate enterprise management.
+2
+
+--- Page 8 ---
+CHAPTER 2
+LITERATURE REVIEW
+2.1 HISTORICAL CONTEXT
+Historically, managing institutional knowledge and documentation relied on manual systems
+such as filing cabinets, static intranets, or basic search tools. Users had to manually sift through
+large volumes of papers or PDFs, often relying on keywords or memory to locate relevant
+information. As data volume grew, these methods became increasingly inefficient and
+impractical. Even with digital document repositories, the lack of intelligent search and
+contextual understanding made it difficult to retrieve precise information. This project builds
+on the evolution from static archives to AI-driven, retrieval-augmented systems, enhancing
+accessibility, accuracy, and user interaction with unstructured data.
+2.2 INITIATIVE ASPECT
+The initiative behind this project is to revolutionize how users access and interact with
+unstructured data using intelligent automation. Instead of relying on traditional search tools or
+manual document review, the system empowers users to query vast document collections
+through natural language conversations. By integrating advanced Large Language Models with
+a Retrieval-Augmented Generation pipeline, the project bridges the gap between static data
+storage and dynamic knowledge exploration. This initiative emphasizes scalability, user-
+friendliness, and adaptability, laying the groundwork for smarter knowledge management
+solutions in education, enterprise, and beyond.
+2.3 CURRENT SCENARIO
+In the current digital landscape, organizations and individuals are overwhelmed by vast
+quantities of unstructured data—ranging from academic notes and technical reports to business
+documents and research papers. Traditional search tools fail to deliver context-aware results,
+forcing users to manually comb through files for relevant information. With the rapid growth
+of AI technologies, there is rising demand for systems that can interpret and respond to natural
+language queries, rather than relying solely on keywords. However, many existing systems still
+lack seamless integration between document storage, intelligent retrieval, and user interaction.
+This project addresses that gap by offering an AI-powered, chat-based document retrieval
+system that delivers precise, reference-backed responses in real time.
+3
+
+--- Page 9 ---
+CHAPTER 3
+EXISTING METHOD
+Existing methods for document retrieval and knowledge access generally fall into two categories:
+traditional search systems and keyword-based filtering tools. These approaches rely heavily on
+structured metadata or exact keyword matches, offering limited support for semantic
+understanding. For instance, enterprise document management systems and static knowledge
+bases allow users to search by title, tag, or content snippet but often fail to capture context or
+intent behind natural language queries. Even advanced solutions like PDF extractors and OCR
+tools do little to enhance user interaction beyond text extraction. In some cases, basic chatbots
+are used to fetch data, but they lack the ability to reason over large document sets or generate
+meaningful, context-aware responses. As a result, users waste valuable time navigating irrelevant
+information, leading to frustration and inefficiencies. While vector databases and AI-powered
+tools have begun emerging, few solutions fully integrate retrieval, natural language
+understanding, and real-time response generation in a unified, user-friendly interface.
+3.1 DISADVANTAGES
+Existing document retrieval systems often rely on keyword-based search or scattered file
+storage, resulting in inefficiencies and low accuracy. They lack semantic understanding,
+conversational interaction, and the ability to provide trustworthy, reference-backed answers.
+These limitations highlight the need for an intelligent, AI-powered document query and retrieval
+system.
+3.1.1 Limited Search Accuracy
+Most current systems depend on exact keyword matches, failing to understand user intent or
+context. This leads to irrelevant or incomplete results, requiring users to spend extra time filtering
+through unrelated content.
+3.1.2 No Natural Language Support
+Users must frame queries based on file names or exact phrases. There’s no provision to ask
+questions conversationally or pose complex queries in natural language, making the user
+experience less intuitive.
+3.1.3 Fragmented Document Storage
+Documents are often scattered across file systems, cloud drives, or intranets. Without a
+centralized index or retrieval layer, locating the right document becomes difficult and time-
+consuming.
+4
+
+--- Page 10 ---
+3.1.4 Lack of Context Awareness
+Traditional systems cannot provide meaningful insights or synthesized answers from multiple
+documents. They simply surface files, leaving users to interpret and extract information on their
+own.
+3.1.5 Static and Unscalable
+Legacy systems are often rigid, hard to integrate with modern AI tools, and don’t scale easily with
+growing document volume. Upgrading or adding features requires major rework or infrastructure
+overhaul.
+3.1.6 No Real-Time Interaction
+Most tools provide document links rather than precise reference snippets. Users must open and
+search through long documents manually, affecting productivity and satisfaction.
+3.1.7 Poor Reference Linking
+Most tools provide document links rather than precise reference snippets. Users must open and
+search through long documents manually, affecting productivity and satisfaction.
+3.1.8 No Support for Multiple AI Providers
+Current methods restrict users to one model or none at all. There’s no modularity to switch between
+local LLMs, paid cloud APIs, or hybrid architectures based on the use case or cost.
+3.1.9 No Source Transparency
+AI-based summarizers or answer bots often don't show where the information came from. This
+reduces credibility and increases the risk of misinformation.
+3.1.10 No Security or Role Control
+Document access is often poorly controlled. Sensitive data can be accessed or altered by
+unauthorized users due to lack of authentication and access management.
+3.1.11 High Cognitive and Operational Load
+Users spend valuable time navigating interfaces, formatting queries, and validating search results
+manually. This hampers productivity and causes frustration.
+3.1.12 No Intelligent Preprocessing
+Most systems don’t support document chunking, embedding, or metadata enrichment, preventing
+deeper AI-based search capabilities.
+These disadvantages emphasize the urgent need for a modern, intelligent, retrieval-augmented
+system capable of providing accurate, context-aware, and conversational access to information,
+while maintaining scalability, usability, and data security.
+5
+
+--- Page 11 ---
+CHAPTER 4
+PROPOSED METHOD
+The AI-Powered Document Retrieval Chatbot System is an intelligent knowledge discovery
+platform designed to streamline document search and retrieval using conversational AI and
+RAG (Retrieval-Augmented Generation). Built with a modular architecture, it integrates a
+Flask-based backend for RAG processing, a React frontend for user interaction, and optional
+microservices like chat history logging using Node.js and MongoDB.
+The system enables users to upload documents, query them via natural language, and receive
+precise answers supported by source citations. It utilizes Python for core logic, document
+embedding, chunking, and LLM integration (via Gemini or Ollama clients). The robust backend
+exposes RESTful APIs (/api/chat, /api/search, /api/documents) that power the complete user
+workflow—from query submission to answer retrieval.
+Key roles in the system include the End User, who searches or queries documents; the
+Document Admin, who uploads and manages the source repository; and the System Admin,
+who maintains configurations and integrations. A React-based web interface ensures seamless
+UX across conversations, document search, and notification flows.
+Embedding computation, chunk storage, and retrieval mechanisms are intelligently handled
+using vector-based indexing, and the system is capable of plugging into various scalable vector
+databases during production use. With RBAC (role-based access control), pluggable LLM
+support, and automated document ingestion, the system provides a comprehensive, secure, and
+scalable solution for modern information retrieval needs.
+4.1 ADVANTAGES
+The AI-Powered Document Retrieval Chatbot System delivers a transformative solution for
+navigating and extracting insights from large document repositories. It eliminates the need for
+manual document searches and significantly enhances accessibility, accuracy, and response
+speed through conversational AI and context-aware retrieval.
+6
+
+--- Page 12 ---
+4.1.1 Automated Document Retrieval
+The system allows users to query vast amounts of unstructured data using natural language. It
+retrieves relevant content efficiently using RAG (Retrieval-Augmented Generation)
+technology, eliminating the need for manual searching and reducing cognitive load on the user.
+4.1.2 Contextual and Accurate Responses
+By leveraging embeddings and LLM capabilities, the chatbot delivers highly accurate answers
+with contextually appropriate references from the most relevant document sections. This
+minimizes misinformation and supports dependable decision-making.
+4.1.3 Smart Document Chunking and Search
+The system intelligently chunks and embeds documents during ingestion, enabling faster and
+more relevant search results. It even supports long documents and differentiates between
+multiple content types without sacrificing performance.
+4.1.4 Seamless Multi-Platform Frontend
+A user-friendly React-based chat interface allows users to search, interact, and navigate through
+document references effortlessly. The interface is responsive, intuitive, and supports real-time
+conversations.
+4.1.5 Improved Efficiency and Productivity
+By automating document search and enabling instant contextual responses, the system
+drastically reduces time spent on manual lookups, improving individual and organizational
+productivity.
+4.1.6 Enhanced Audit and Traceability
+All user queries, responses, and document interactions are logged for future reference. This
+audited trail enhances transparency, supports compliance, and enables system optimization
+through query analysis.
+4.1.7 Scalable and Modular
+The architecture supports microservices, pluggable LLMs, and scalable vector storage (e.g.,
+FAISS, Pinecone). This flexible design enables the system to grow with evolving project and
+organizational needs.
+4.1.8 Reduced Cognitive Load with Chat Interface
+The conversational interface allows users to frame queries naturally, reducing the need to
+remember keywords, filters, or command syntaxes. This modern approach democratizes
+complex data access for non-technical users.
+7
+
+--- Page 13 ---
+4.1.9 Accurate Source Referencing and Reliability
+The conversational interface allows users to frame queries naturally, reducing the need to
+remember keywords, filters, or command syntaxes. This modern approach democratizes
+complex data access for non-technical users.
+These advantages position the AI-Powered Document Retrieval Chatbot as a pioneering solution
+for modern research, knowledge management, and enterprise document intelligence. It replaces
+outdated keyword-based search systems with smart, responsive, and interactive retrieval—
+optimizing both time and accuracy in information-driven workflows.
+8
+
+--- Page 14 ---
+CHAPTER 5
+SYSTEM ANALYSIS
+The AI-Powered Document Retrieval Chatbot System is an advanced, modular platform
+designed to enable seamless access to organizational knowledge via natural language interaction.
+It leverages a combination of cutting-edge technologies including Python, Flask, React,
+MongoDB, and RAG-based machine learning pipelines to deliver real-time, contextual document
+search and retrieval. This system ensures secure access control, high user engagement through
+conversational interfaces, and scalable architecture suitable for enterprise-level adoption. Below
+is a breakdown of the core technologies and their roles within the system.
+5.1 SOFTWARE REQUIREMENTS
+5.1.1 Python
+Python serves as the primary backend language for the RAG (Retrieval-Augmented Generation)
+system. Python modules manage document ingestion, embedding, and integration with various
+LLM providers such as Gemini or Ollama. Its flexibility and strong ML ecosystem make it ideal
+for handling the system’s core logic, preprocessing, embedding generation, API construction,
+and LLM interactions.
+5.1.2 JavaScript (React Frontend)
+React forms the basis of the interactive frontend client. It provides a dynamic user interface (UI)
+that facilitates real-time communication with the backend API. JavaScript handles user input,
+asynchronously renders responses from the chatbot, and manages frontend state, ensuring a
+smooth conversational search experience.
+5.1.3 Flask (Python Web Framework)
+Flask is used to build the RESTful backend of the platform. It exposes routes for handling user
+requests, document search, chat interactions, and health checks. Flask’s lightweight nature allows
+for quick development, while still supporting features like middleware, secure routing, request
+validation, and integration with external services like vector databases or loggers.
+9
+
+--- Page 15 ---
+5.1.4 Node.js / Express
+Node.js and Express are used to power optional microservices, such as the chat history backend.
+These services handle tasks like storing chat logs, providing tabular chat history, and offering
+additional real-time dashboards. The architecture allows this microservice to be decoupled and
+horizontally scaled when needed.
+5.1.5 MongoDB (NoSQL Database)
+MongoDB is used to store system data including chat histories, user profiles, and document
+metadata. Its document-oriented structure (BSON format) is ideal for flexible, hierarchical data
+such as chat logs or modular document sources. MongoDB's scalability suits large datasets,
+enabling fast writes and efficient queries even at scale.
+5.1.6 RAG Components(Embeddings + LLM)
+The Retrieval-Augmented Generation pipeline integrates document embeddings and language
+models to provide accurate and contextual responses. Technologies like FAISS or Pinecone
+may serve as vector stores for embeddings, while plugins like gemini_client.py or
+ollama_client.py abstract LLM communication. This hybrid setup ensures grounded and
+verifiable answers.
+10
+
+--- Page 16 ---
+CHAPTER 6
+DESIGN AND IMPLEMENTATION
+6.1 WORK FLOW
+The workflow of the RAG-based document assistant begins with the user interacting through a
+chat interface, where they submit a query or request for information. The system first interprets
+the user's intent and retrieves relevant documents from a vector database using semantic search.
+These documents are then passed along with the query to a language model, which synthesizes
+a context-aware response. The generated answer is returned to the user in a conversational
+format. The user may then refine their query, triggering another cycle of retrieval and generation.
+If feedback or corrections are provided, the system logs the interaction for future model fine-
+tuning or indexing improvements.
+Figure 6.1.1 Work Flow
+6.2 SYSTEM ARCHITECHTURE
+6.2.1 Frontend Layer
+The frontend layer includes two primary interfaces: the Chatbot Interface and the Admin
+Dashboard. The Chatbot Interface serves as the primary point of interaction for end-users,
+11
+
+--- Page 17 ---
+allowing them to submit questions and receive context-aware responses based on the uploaded
+documents. The Admin Dashboard enables administrators to upload new documents, monitor
+system performance, and manage user access. Both interfaces are developed to be intuitive and
+responsive, ensuring smooth user experience across various devices.
+6.2.2 Backend Layer
+The backend layer is built using a Python-based Flask API that manages business logic and
+communication between the frontend and database. The core modules include the Document
+Processing Module, which extracts text from uploaded files; the Embedding Module, which
+converts text into semantic vectors using pre-trained models; and the Query Engine, which
+retrieves relevant document chunks using a vector database. The Response Generation Module
+integrates with an LLM to produce precise answers by combining user queries with retrieved
+context.
+6.2.3 Database Layer
+The database layer comprises two main components: the Vector Store (e.g., FAISS or
+ChromaDB) and a Metadata Database (e.g., MongoDB). The Vector Store holds the
+embeddings generated from the documents, enabling fast similarity search during user queries.
+The Metadata Database stores document metadata, user details, admin logs, upload history, and
+system configurations. This dual structure ensures efficient data access, scalability, and easy
+management of both structured and unstructured data.
+6.2.4 Security Layer
+The security layer ensures the integrity, confidentiality, and authenticated access of the system.
+It includes JWT-based Authentication to validate user sessions, Role-Based Access Control
+(RBAC) to differentiate between admin and user permissions, and encryption protocols for safe
+storage and transmission of data. Additionally, the system includes safeguards to prevent
+unauthorized querying of sensitive documents and logs all user interactions for traceability.
+6.3 IMPLEMENTATION
+The RAG-based Document Assistant system was developed using a modular architecture
+comprising the Chatbot Interface, Admin Portal, and Semantic Retrieval Engine. The
+backend is built using the Flask web framework due to its simplicity, flexibility, and seamless
+support for RESTful API development. A combination of MongoDB (for metadata, user
+12
+
+--- Page 18 ---
+credentials, and admin logs) and a vector database such as FAISS (for storing document
+embeddings) is used to persist data. The backend route to handle request for creating chatbot and
+initialize and loading the document is given below:
+@app.route('/api/chat', methods=['POST'])
+def chat():
+"""Main chat endpoint"""
+try:
+data = request.get_json()
+if not data or 'message' not in data:
+return jsonify({'error': 'Message is required'}), 400
+message = data['message'].strip()
+if not message:
+return jsonify({'error': 'Message cannot be empty'}), 400
+rag = initialize_rag()
+if not rag:
+return jsonify({'error': 'RAG system not initialized'}), 500
+if not rag_initialized:
+return jsonify({'error': 'No documents loaded'}), 500
+logger.info(f"Processing query: {message}")
+result = rag.ask_question(message)
+raw_response = result.get('response', '') if isinstance(result, dict) else str(result)
+# Format response and extract paragraphs/points (see helper functions)
+formatted_text, paragraphs = format_response_text(raw_response)
+response_points = extract_points(paragraphs)
+return jsonify({
+'response': formatted_text,
+'response_paragraphs': paragraphs,
+'response_points': response_points,
+'sources': result.get('sources', []) if isinstance(result, dict) else [],
+'status': 'success',
+13
+
+--- Page 19 ---
+'mode': result.get('mode', 'unknown') if isinstance(result, dict) else 'unknown'
+})
+except Exception as e:
+logger.error(f"Error processing chat request: {e}")
+return jsonify({'error': 'Internal server error'}), 500
+def initialize_rag():
+"""Initialize the RAG system"""
+global rag_instance, rag_initialized
+if rag_initialized:
+return rag_instance
+try:
+logger.info("Initializing RAG system...")
+# Try to initialize RAG, but handle network errors gracefully
+try:
+rag_instance = MistralRAG()
+except Exception as model_error:
+logger.error(f" Failed to initialize RAG system: {model_error}")
+logger.info(" Falling back to demo RAG implementation")
+try:
+rag_instance = demo_rag.MistralRAG()
+rag_initialized = True
+logger.info(" Demo RAG initialized as a fallback")
+except Exception as demo_error:
+logger.error(f" Failed to initialize demo RAG fallback: {demo_error}")
+return None
+# Load .txt files from data directory into RAG
+data_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'data')
+if os.path.exists(data_dir):
+for filename in os.listdir(data_dir):
+14
+
+--- Page 20 ---
+if filename.endswith('.txt'):
+file_path = os.path.join(data_dir, filename)
+logger.info(f"Loading document: {filename}")
+try:
+rag_instance.add_document_from_file(file_path)
+except Exception as load_error:
+logger.error(f" Failed to load document {filename}: {load_error}")
+rag_initialized = True
+logger.info(f" RAG system initialized with {len(rag_instance.chunks)} chunks")
+else:
+logger.warning(" Data directory not found")
+rag_initialized = True # still mark as initialized for dev
+return rag_instance
+except Exception as e:
+logger.error(f" Failed to initialize RAG: {e}")
+return None
+15
+
+--- Page 21 ---
+CHAPTER 7
+RESULT AND ANALYSIS
+7.1 CHATBOT PAGE
+The chatbot page serves as the primary interface for users to interact with your RAG-based
+document assistant. Designed with a clean and conversational UI, it allows users to ask
+questions in natural language and receive contextual, intelligent responses. The page includes
+a message input box, a chat thread displaying queries and answers, and support for file upload
+to enhance retrieval relevance. It provides real-time response streaming, auto-scroll, and a clear
+indication of response sources. Minimal distractions ensure a focused, user-friendly experience
+for seamless knowledge access.
+Figure 7.1.1 Chatbot Page
+7.2 SEARCH DOCUMENT PAGE
+The Search Document page is a dedicated interface for exploring the document chunks
+retrieved by your RAG system. It allows users to enter a query and instantly view a ranked list
+of relevant text segments extracted from the uploaded documents. Each chunk is displayed with
+its source document name, relevance score, and contextual preview, making it easy to
+understand why it was selected. The page includes filtering options by document, date added,
+or chunk relevance. This interface helps users validate retrieval quality, navigate large
+documents efficiently, and access specific information without reading entire files.
+16
+
+--- Page 22 ---
+Figure 7.2.1 Search document page
+7.3 UPLOAD DOCUMENT
+The Upload Document page serves as the entry point for adding knowledge sources into the
+system. It allows users to securely upload documents in various formats such as PDF, DOCX,
+or TXT. Once uploaded, the system automatically processes and indexes the content to make it
+searchable through the conversational interface. This page includes features like file validation,
+upload progress tracking, and metadata tagging. It also visually displays the status of each
+upload (e.g., pending, processed, failed) and provides options to view, delete, or reprocess
+documents. Designed for simplicity and efficiency, it ensures users can seamlessly integrate
+new data into the AI-powered retrieval system..
+Figure 7.3.1 Upload Document Page
+17
+
+--- Page 23 ---
+7.4 LOADED DOCUMENT PAGE
+The Loaded Document page displays all the documents that have been successfully uploaded
+and indexed in the system. It offers users a centralized view of their document library, complete
+with file names, upload timestamps, document types, and processing status. Each document
+entry includes options like download, view content summary, delete, or trigger re-indexing.
+Built-in search and filter functionality helps users quickly locate specific files by keyword, tag,
+or format. This page ensures transparent document management and provides a foundation for
+the retrieval system to deliver precise, context-based responses during user queries. It promotes
+clarity, control, and easy maintenance of the document database.
+Figure 7.4.1 Loaded Document Page
+18
+
+--- Page 24 ---
+CHAPTER 8
+CONCLUSION AND FUTURE ENHANCEMENT
+8.1 CONCLUSION
+The AI-powered Document Retrieval and Chat System revolutionizes the way users interact
+with unstructured information. By integrating advanced natural language processing with an
+intelligent retrieval pipeline, the platform offers an intuitive, conversational interface for
+accessing document-based knowledge. Its robust backend, driven by a combination of Flask,
+vector databases, and transformer-based embeddings, ensures efficient indexing, accurate result
+generation, and seamless scalability. With features like real-time reference linking, document
+upload management, and context-aware responses, the system not only enhances productivity
+but also sets new standards for smart knowledge exploration. This solution paves the way for
+more dynamic, human-centric interaction with digital content, transforming how individuals
+and organizations manage and extract value from their data.
+8.2 FUTURE ENHANCEMENT
+Future enhancements for the RAG-based document query system aim to boost its efficiency,
+scalability, and versatility. First, support for multi-format inputs, including handwritten
+documents and images via OCR, can expand use cases. Domain-specific fine-tuning of the
+language model will enhance precision in specialized fields like healthcare or law. Real-time
+data integration from APIs or email systems will enable up-to-date responses. Hybrid search
+models, combining semantic and keyword-based retrieval, can handle complex queries more
+accurately. Incorporating multilingual processing will allow interaction across languages.
+Adding visualization tools such as charts or knowledge graphs can enrich output understanding.
+Enhanced access control with role-based permissions will improve security. Contextual session
+memory will support personalized user experiences. Mobile and edge deployment optimization
+will enable offline and low-latency applications. Finally, explainability features, like citing
+source snippets, will increase trust and transparency in system responses.
+19
+
+--- Page 25 ---
+REFERENCES
+[1] Grinberg, M. (2018). Flask Web Development: Developing Web Applications with Python. O’Reilly
+Media.
+[2] Lewis, P., Perez, E., Piktus, A., et al. (2020). “Retrieval-Augmented Generation for Knowledge-
+Intensive NLP Tasks,” Advances in Neural Information Processing Systems, 33, pp. 9459–9474.
+[3] Chodorow, K. (2019). MongoDB: The Definitive Guide: Powerful and Scalable Data Storage.
+O’Reilly Media.
+[4] Johnson, J. (2023). “Semantic Search with Vector Databases,” Journal of Machine Learning
+Applications, vol. 5, no. 2, pp. 88–96.
+[5] Brown, T. B., Mann, B., Ryder, N., et al. (2020). “Language Models are Few-Shot Learners,”
+Advances in Neural Information Processing Systems, 33, pp. 1877–1901.
+[6] Naqvi, S. A. G. R., & Ansari, A. S. (2021). “Modern Web Systems for Intelligent Data Interaction,”
+IEEE Access, vol. 9, pp. 117289–117300. DOI: 10.1109/Access.2021.3109030.
+[7] Duckett, J. (2011). HTML and CSS: Design and Build Websites. Wiley.
+[8] Flanagan, D. (2020). JavaScript: The Definitive Guide. O’Reilly Media.
+[9] Ravichandiran, K. (2021). Transformers for Natural Language Processing: Build Innovative Deep
+Neural Network Architectures for NLP with Python, PyTorch, TensorFlow, BERT, RoBERTa, and More.
+Packt Publishing.
+[10] Goyal, S., & Khanna, A. (2023). “Interactive Knowledge Retrieval Using Hybrid LLM
+Architectures,” International Conference on Artificial Intelligence Trends and Applications, pp. 155–
+162.
+
