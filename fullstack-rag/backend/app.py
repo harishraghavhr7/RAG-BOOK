@@ -80,7 +80,6 @@ def initialize_rag():
                 logger.info("💡 You can try to run the demo directly: python fullstack-rag/backend/app_demo.py")
                 return None
         
-        # Load data from the data directory
         data_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'data')
         
         if os.path.exists(data_dir):
