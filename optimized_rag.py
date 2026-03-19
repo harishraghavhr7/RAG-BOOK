@@ -11,7 +11,6 @@ except Exception as e:
     _logging.getLogger(__name__).warning(f"NumPy import failed: {e}. Embedding and FAISS operations will be disabled.")
 from sentence_transformers import SentenceTransformer
 
-# Configure logging early so we can use logger during module import
 import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
